@@ -24,7 +24,13 @@ fn main_page() -> impl Responder {
 
 
 fn calc_expr(info: web::Path<(String)>) -> impl Responder {
-    let expr =  info.as_str().to_string();
+    let expr = info.as_str().to_string()
+        .replace("div", "//")
+        .replace("opb", "(") // open bracket
+        .replace("clb", ")") // close bracket
+        .replace("mul", "*")
+        .replace("add", "+")
+        .replace("sub", "-");
 
     let re = Regex::new(r"^[-0-9)(*/+]*$").unwrap();
     if !re.is_match(&expr) {
@@ -40,10 +46,12 @@ fn calc_expr(info: web::Path<(String)>) -> impl Responder {
     };
 
     let res_str = String::from_utf8_lossy(&output.stdout);
+    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
     let results: Vec<&str> = res_str.trim().split("\n").collect();
     if results[0] == "0" {
         return HttpResponse::Conflict().body("Bad formation");
     }
+    println!("{:?}", results);
     HttpResponse::Ok().body(format!("{}", results[1]))
 }
 
@@ -55,7 +63,7 @@ pub fn run_server(a_config: Arc<Mutex<Config>>) {
             // enable logger - always register actix-web Logger middleware last
             .wrap(middleware::Logger::default())
             .service(web::resource("/main").to(main_page))
-            .service(web::resource("/{expr}/calc").to(calc_expr))
+            .service(web::resource("/calc/{expr}").to(calc_expr))
     )
         .bind(config.bind_address)
         .unwrap()
